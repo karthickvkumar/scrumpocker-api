@@ -10,23 +10,64 @@ app.use(cors({
   origin: "http://localhost:8000"
 }));
 
+const sessions = {};
+const sessionStatus = {};
+
 app.get('/', (req, res) => {
-  res.status(200).send('Server is Running')
+  res.status(201).send('Server is Running')
+});
+
+app.get('/sessions', (req, res) => {
+  res.status(201).send(sessions)
+});
+
+app.get('/session-status', (req, res) => {
+  res.status(201).send(sessionStatus)
+});
+
+app.post('/voting-status', (req, res) => {
+  let sessionName = req.body.sessionName
+  res.status(201).send(sessionStatus[sessionName])
 });
 
 io.on('connection', (socket) => {
-  socket.on('join-session', (response) => {
-    io.sockets.emit('join-session', response)
+
+  socket.on('create-session', (sessionName) => {
+    socket.join(sessionName);
+    sessions[sessionName] = [];
+    sessionStatus[sessionName] = {
+      canVote : false
+    };
+  });
+
+  socket.on('join-session', (sessionName, user) => {
+    user.id = socket.id;
+    socket.join(sessionName);
+    sessions[sessionName].push(user);
+    io.to(sessionName).emit('new-user-joined', user);
+  });
+
+  socket.on('start-story-voting', (sessionName, story) => {
+    socket.join(sessionName);
+    sessionStatus[sessionName] = {
+      canVote : true,
+      story
+    };
+    io.to(sessionName).emit('enable-story-voting', story);
+  });
+  
+  socket.on('user-story-point-selection', (sessionName ,response) => {
+    socket.join(sessionName);
+    io.to(sessionName).emit('story-point', response);
   }); 
 
-  socket.on('session-story', (response) => {
-    io.sockets.emit('session-story', response)
+  socket.on('story-points-revealed', (sessionName) => {
+    socket.join(sessionName);
+    io.to(sessionName).emit('disable-users', true);
   }); 
 
-  socket.on('story-point', (response) => {
-    io.sockets.emit('story-point', response)
-  }); 
 }); 
+
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
