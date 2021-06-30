@@ -43,6 +43,9 @@ io.on('connection', (socket) => {
 
   socket.on('join-session', (sessionName, user) => {
     user.id = socket.id;
+    if(!sessions || !sessions[sessionName]){
+      return;
+    }
     socket.join(sessionName);
     sessions[sessionName].push(user);
     io.to(sessionName).emit('new-user-joined', user);
